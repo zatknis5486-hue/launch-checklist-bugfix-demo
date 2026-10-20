@@ -1,0 +1,201 @@
+# Search and status filters silently ignored (stale derived state)
+
+> **Self-created technical demo — not client work.** The bug in this repository was introduced on purpose to build a
+> reproducible before/after example. It is not taken from anyone's codebase, and no
+> client was involved. Everything below was measured in this repository by
+> `npm run case:build` on 2026-10-20T01:04:24.615Z.
+
+| | |
+|---|---|
+| Bug commit | `f046d6169579e6246e8641594acf4fe9773536bb` — Initial Launch Checklist app (tag `demo-bug`) |
+| Fix commit | `c9eb26dac438c3108a63ff1185ecea36d803e1e0` — Fix: search and status filters ignored (stale derived state) (tag `demo-fix`) |
+| Regression test | `src/App.test.tsx` |
+| Source files changed by the fix | `src/App.tsx` |
+| Public repository | REPLACE_ME: public repo URL once the founder publishes the demo |
+
+## Stack
+
+- Vite 7.3.7
+- React 19.3.1
+- TypeScript 5.9.3
+- Vitest 3.2.7
+- Testing Library (React) 16.3.3
+- ESLint 9.39.5 with eslint-plugin-react-hooks 5.2.0
+
+## Summary
+
+In a small React checklist app, the search box and the status filter looked broken: typing or picking a status changed nothing on screen. The filtered list was kept in its own useState and refreshed by a useEffect that only watched the task array, so it never re-ran when the query or the status changed.
+
+## What the user saw
+
+You type "redirect" into the search box and all nine tasks stay on screen; you click the "Open" filter and the done tasks stay too. The summary line still says "Showing 9 of 9 tasks". As soon as you tick any checkbox, the list suddenly applies the filters you chose earlier, which makes the bug look intermittent and hard to describe.
+
+## How to reproduce
+
+1. Check out the bug commit: git checkout demo-bug (then npm install if you have not already).
+2. Start the app: npm run dev, and open the printed localhost URL in a browser.
+3. Type "redirect" in the "Search tasks" box. Expected: only "Configure Supabase auth redirect URL for the production domain" remains. Actual: all 9 tasks stay visible and the summary still reads "Showing 9 of 9 tasks (6 open)".
+4. Click the "Open" status chip. Expected: the 3 done tasks disappear. Actual: nothing changes.
+5. Tick any task checkbox. Actual: the list now suddenly applies both filters, because toggling changes the task array, which is the only thing the effect watches.
+6. Optional: run npm run lint on this commit. ESLint reports react-hooks/exhaustive-deps on the useEffect in src/App.tsx, naming the missing "query" and "status" dependencies.
+7. Return to the fixed code with git checkout main and repeat steps 2 to 4: filtering now happens as you type and as you click.
+
+## Root cause
+
+src/App.tsx stored the filtered list as separate state, const [visible, setVisible] = useState<Task[]>(tasks), and synchronised it with useEffect(() => { setVisible(filterTasks(tasks, query, status)) }, [tasks]). The dependency array lists only tasks, so React re-runs the effect when a task is toggled but not when query or status change. The inputs themselves render correctly because they have their own state, so the UI looks responsive while the list silently shows stale data. The react-hooks/exhaustive-deps lint rule flagged exactly this line in the first commit, but a warning is easy to scroll past.
+
+## The fix
+
+Replace the state-plus-effect pair with a derived value: const visible = useMemo(() => filterTasks(tasks, query, status), [tasks, query, status]). The filtered list is now computed during render from its three inputs, so there is no second copy of the data that can fall out of sync and no extra render pass after each change. The commit also adds a regression test (src/App.test.tsx) that drives the real UI with Testing Library: it types into the search box and selects the Open filter, then asserts on the rendered titles. Unit tests for the pure filterTasks helper (src/lib/filterTasks.test.ts) pin down the matching rules.
+
+Diff between `demo-bug` and `demo-fix` (`src/` only, test files excluded):
+
+```diff
+diff --git a/src/App.tsx b/src/App.tsx
+index e896931..dc031b9 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useState } from 'react'
++import { useMemo, useState } from 'react'
+ import { SearchBox } from './components/SearchBox'
+ import { StatusFilter } from './components/StatusFilter'
+ import { Summary } from './components/Summary'
+@@ -12,11 +12,12 @@ export default function App() {
+   const [query, setQuery] = useState('')
+   const [status, setStatus] = useState<StatusFilterValue>('all')
+ 
+-  const [visible, setVisible] = useState<Task[]>(tasks)
+-
+-  useEffect(() => {
+-    setVisible(filterTasks(tasks, query, status))
+-  }, [tasks])
++  // Derived data: computed from the current inputs on every relevant change,
++  // instead of being copied into its own state and synced with an effect.
++  const visible = useMemo(
++    () => filterTasks(tasks, query, status),
++    [tasks, query, status],
++  )
+ 
+   function toggleTask(id: string) {
+     setTasks((previous) =>
+```
+
+## Proof: the regression test fails before and passes after
+
+`npm run prove` (scripts/prove-regression.mjs) temporarily writes the `demo-bug`
+version of `src/App.tsx` into the working tree, runs the test suite from HEAD against
+it, restores the file, and runs the suite again. It exits 0 only when the first run fails
+and the second passes. Local paths are shown as `<repo>`; long output is trimmed where marked.
+
+### Before: tests run against the `demo-bug` source
+
+```text
+ RUN  v3.2.7 <repo>
+
+ ✓ src/lib/filterTasks.test.ts (7 tests) 3ms
+ ❯ src/App.test.tsx (5 tests | 3 failed) 624ms
+   ✓ Launch Checklist filters > shows every seeded task before any filter is applied 33ms
+   × Launch Checklist filters > filters the list as you type in the search box 191ms
+     → expected [ …(9) ] to deeply equal [ Array(1) ]
+   × Launch Checklist filters > hides done tasks when the Open status filter is selected 75ms
+     → expected [ …(9) ] to not include 'Set VITE_SUPABASE_ANON_KEY in Vercel …'
+   × Launch Checklist filters > combines the search query with the status filter 248ms
+     → expected [ …(9) ] to deeply equal [ …(2) ]
+   ✓ Launch Checklist filters > toggling a task updates the open count 75ms
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  3 failed | 9 passed (12)
+   Start at  10:04:17
+   Duration  2.87s (transform 98ms, setup 458ms, collect 430ms, tests 628ms, environment 2.15s, prepare 426ms)
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/App.test.tsx > Launch Checklist filters > filters the list as you type in the search box
+AssertionError: expected [ …(9) ] to deeply equal [ Array(1) ]
+
+- Expected
++ Received
+
+  [
++   "Set VITE_SUPABASE_URL in Vercel project settings",
++   "Set VITE_SUPABASE_ANON_KEY in Vercel project settings",
++   "Enable RLS on profiles table",
+    "Configure Supabase auth redirect URL for the production domain",
++   "Review the magic-link email template in Supabase Auth",
++   "Run production build locally",
++   "Fix TypeScript errors that block the production build",
++   "Add a 404 page and an error boundary",
++   "Set up an uptime check for the production URL",
+  ]
+
+ ❯ src/App.test.tsx:28:29
+     26|     await user.type(screen.getByRole('searchbox', { name: /search task…
+     27|
+     28|     expect(visibleTitles()).toEqual([
+       |                             ^
+     29|       'Configure Supabase auth redirect URL for the production domain',
+     30|     ])
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+… [40 more lines trimmed: details of the remaining failing tests] …
+```
+
+### After: tests run on `demo-fix`
+
+```text
+ RUN  v3.2.7 <repo>
+
+ ✓ src/lib/filterTasks.test.ts (7 tests) 4ms
+ ✓ src/App.test.tsx (5 tests) 628ms
+
+ Test Files  2 passed (2)
+      Tests  12 passed (12)
+   Start at  10:04:21
+   Duration  2.77s (transform 89ms, setup 420ms, collect 429ms, tests 632ms, environment 2.02s, prepare 453ms)
+```
+
+### The warning that was already there
+
+ESLint output for the `demo-bug` version of the changed file (rule `react-hooks/exhaustive-deps`,
+configured at its default level, "warn"):
+
+```text
+<repo>\src\App.tsx
+  19:6  warning  React Hook useEffect has missing dependencies: 'query' and 'status'. Either include them or remove the dependency array. You can also replace multiple useState variables with useReducer if 'setVisible' needs the current value of 'query'  react-hooks/exhaustive-deps
+
+✖ 1 problem (0 errors, 1 warning)
+```
+
+## Lesson
+
+If a value can be computed from props or state, compute it during render (a plain expression or useMemo) instead of copying it into state and syncing it with an effect. Treat react-hooks/exhaustive-deps warnings as bugs until proven otherwise, and cover the user-visible behaviour with a test that fails before the fix.
+
+## Screenshot instructions (no screenshots are included yet)
+
+This write-up was generated without a browser, so it contains **no screenshots**. To add
+honest before/after screenshots yourself:
+
+1. `git checkout demo-bug` (detached HEAD is fine). Run `npm run dev` and open the printed
+   localhost URL. Use a plain browser window with no personal bookmarks or extensions visible.
+2. Type `redirect` in the **Search tasks** box. The list still shows all 9 tasks and the summary
+   still reads "Showing 9 of 9 tasks (6 open)". Capture the app area and save it as
+   `case/screenshots/before-search.png`.
+3. Click the **Open** chip. The 3 done tasks are still listed. Save as
+   `case/screenshots/before-status.png`.
+4. Stop the dev server. `git checkout main` and run `npm run dev` again.
+5. Repeat step 2: only one task remains and the summary reads "Showing 1 of 9 tasks (6 open)".
+   Save as `case/screenshots/after-search.png`.
+6. Repeat step 3 (clear the search box first): 6 open tasks remain. Save as
+   `case/screenshots/after-status.png`.
+7. Keep the window size identical for all four captures, crop to the app, then reference the
+   images from this file under a new "Screenshots" heading and commit them together with the
+   images. Do not present them as anything other than captures of this demo app.
+
+## Commits
+
+- `f046d6169579e6246e8641594acf4fe9773536bb` Initial Launch Checklist app
+- `c9eb26dac438c3108a63ff1185ecea36d803e1e0` Fix: search and status filters ignored (stale derived state)
+
+Note for the publisher: rewriting authorship before publishing (see README) changes these hashes;
+rerun `npm run case:build` afterwards so this file and `case.json` match the published history.
