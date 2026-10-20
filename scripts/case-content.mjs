@@ -103,5 +103,5 @@ export const caseContent = {
     },
   ],
 
-  repoUrl: 'REPLACE_ME: public repo URL once the founder publishes the demo',
+  repoUrl: 'https://github.com/zatknis5486-hue/launch-checklist-bugfix-demo',
 }

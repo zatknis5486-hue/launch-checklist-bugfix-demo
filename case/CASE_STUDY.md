@@ -11,7 +11,7 @@
 | Fix commit | `0564847a26ac81ae9f98c1474b3a6cf968cc0f27` — Fix: search and status filters ignored (stale derived state) (tag `demo-fix`) |
 | Regression test | `src/App.test.tsx` |
 | Source files changed by the fix | `src/App.tsx` |
-| Public repository | REPLACE_ME: public repo URL once the founder publishes the demo |
+| Public repository | https://github.com/zatknis5486-hue/launch-checklist-bugfix-demo |
 
 ## Stack
 

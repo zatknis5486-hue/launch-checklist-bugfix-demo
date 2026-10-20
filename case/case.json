@@ -37,7 +37,7 @@
       "message": "Fix: search and status filters ignored (stale derived state)"
     }
   },
-  "repoUrl": "REPLACE_ME: public repo URL once the founder publishes the demo",
+  "repoUrl": "https://github.com/zatknis5486-hue/launch-checklist-bugfix-demo",
   "generatedAt": "2026-10-20",
   "screenshots": {
     "capturedAt": "2026-10-20",
