@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+case/.tmp
+*.tsbuildinfo
+.DS_Store
+*.local
