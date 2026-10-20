@@ -3,7 +3,7 @@
 > **Self-created technical demo — not client work.** The bug in this repository was introduced on purpose to build a
 > reproducible before/after example. It is not taken from anyone's codebase, and no
 > client was involved. Everything below was measured in this repository by
-> `npm run case:build` on 2026-10-20T01:04:24.615Z.
+> `npm run case:build` on 2026-10-20.
 
 | | |
 |---|---|
@@ -86,28 +86,31 @@ index e896931..dc031b9 100644
 `npm run prove` (scripts/prove-regression.mjs) temporarily writes the `demo-bug`
 version of `src/App.tsx` into the working tree, runs the test suite from HEAD against
 it, restores the file, and runs the suite again. It exits 0 only when the first run fails
-and the second passes. Local paths are shown as `<repo>`; long output is trimmed where marked.
+and the second passes, judged from Vitest's own report (failed tests counted, test files that
+failed to load rejected), not from the exit code alone. Local paths are shown as `<repo>`;
+timings are replaced by `<time>`, `<elapsed>` and `<n>ms` so reruns are reproducible; long
+output is trimmed where marked.
 
 ### Before: tests run against the `demo-bug` source
 
 ```text
  RUN  v3.2.7 <repo>
 
- ✓ src/lib/filterTasks.test.ts (7 tests) 3ms
- ❯ src/App.test.tsx (5 tests | 3 failed) 624ms
-   ✓ Launch Checklist filters > shows every seeded task before any filter is applied 33ms
-   × Launch Checklist filters > filters the list as you type in the search box 191ms
+ ✓ src/lib/filterTasks.test.ts (7 tests) <n>ms
+ ❯ src/App.test.tsx (5 tests | 3 failed) <n>ms
+   ✓ Launch Checklist filters > shows every seeded task before any filter is applied <n>ms
+   × Launch Checklist filters > filters the list as you type in the search box <n>ms
      → expected [ …(9) ] to deeply equal [ Array(1) ]
-   × Launch Checklist filters > hides done tasks when the Open status filter is selected 75ms
+   × Launch Checklist filters > hides done tasks when the Open status filter is selected <n>ms
      → expected [ …(9) ] to not include 'Set VITE_SUPABASE_ANON_KEY in Vercel …'
-   × Launch Checklist filters > combines the search query with the status filter 248ms
+   × Launch Checklist filters > combines the search query with the status filter <n>ms
      → expected [ …(9) ] to deeply equal [ …(2) ]
-   ✓ Launch Checklist filters > toggling a task updates the open count 75ms
+   ✓ Launch Checklist filters > toggling a task updates the open count <n>ms
 
  Test Files  1 failed | 1 passed (2)
       Tests  3 failed | 9 passed (12)
-   Start at  10:04:17
-   Duration  2.87s (transform 98ms, setup 458ms, collect 430ms, tests 628ms, environment 2.15s, prepare 426ms)
+   Start at  <time>
+   Duration  <elapsed>
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
 
@@ -146,13 +149,13 @@ AssertionError: expected [ …(9) ] to deeply equal [ Array(1) ]
 ```text
  RUN  v3.2.7 <repo>
 
- ✓ src/lib/filterTasks.test.ts (7 tests) 4ms
- ✓ src/App.test.tsx (5 tests) 628ms
+ ✓ src/lib/filterTasks.test.ts (7 tests) <n>ms
+ ✓ src/App.test.tsx (5 tests) <n>ms
 
  Test Files  2 passed (2)
       Tests  12 passed (12)
-   Start at  10:04:21
-   Duration  2.77s (transform 89ms, setup 420ms, collect 429ms, tests 632ms, environment 2.02s, prepare 453ms)
+   Start at  <time>
+   Duration  <elapsed>
 ```
 
 ### The warning that was already there

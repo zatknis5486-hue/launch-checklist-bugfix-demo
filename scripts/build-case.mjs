@@ -13,19 +13,30 @@
  *
  * It then writes case/case.json (machine-readable, fixed field set) and
  * case/CASE_STUDY.md (human-readable). Nothing is written if the proof does
- * not hold (bug run must fail, fixed run must pass).
+ * not hold (bug run must fail, fixed run must pass, judged from Vitest's
+ * parsed report), or if the non-test files under src/ at HEAD differ from
+ * `demo-fix`, because then the diff (tag to tag) and the "after" test run
+ * (measured on HEAD) would describe different code.
+ *
+ * The output is deterministic: timings in the test output are replaced by
+ * placeholders and generatedAt is a date, so rerunning on the same history
+ * rewrites both files byte for byte and leaves the git tree clean.
  *
  * Usage: node scripts/build-case.mjs   (or: npm run case:build)
  *        Set GIT_EXE if git is not on PATH.
+ *        --allow-head-drift   write the case even though HEAD's src/ differs
+ *                             from demo-fix; records "headMatchesFixTag": false
+ *                             in case.json and adds a visible note to the study.
  */
 import { spawnSync } from 'node:child_process'
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { stripVTControlCharacters } from 'node:util'
 import { caseContent } from './case-content.mjs'
-import { BUG_REF, FIX_REF, git, proveRegression, repoRoot } from './prove-regression.mjs'
+import { BUG_REF, FIX_REF, SOURCE_PATHSPEC, describeRun, git, proveRegression, repoRoot } from './prove-regression.mjs'
 
 const caseDir = path.join(repoRoot, 'case')
+const ALLOW_HEAD_DRIFT_FLAG = '--allow-head-drift'
 
 // ---------------------------------------------------------------------------
 // Output cleaning
@@ -52,17 +63,31 @@ function redactPaths(text) {
 }
 
 /**
- * Strip ANSI codes, normalise newlines, redact local paths, collapse blank
- * runs, and keep the useful part: for a failing run that is everything up to
- * the end of the first failure's details (the file list, the summary and the
- * first assertion with its diff); for anything long without that structure,
- * the head and the tail.
+ * Replace the wall-clock parts of a Vitest output line with fixed placeholders
+ * so that two runs on the same history produce identical text:
+ *   "   Start at  10:04:17"            -> "   Start at  <time>"
+ *   "   Duration  2.87s (transform …)" -> "   Duration  <elapsed>"
+ *   " ✓ src/App.test.tsx (5 tests) 628ms" and per-test "… 191ms" -> "… <n>ms"
+ */
+function normaliseTimings(line) {
+  return line
+    .replace(/^(\s*)Start at\s+\S+$/, '$1Start at  <time>')
+    .replace(/^(\s*)Duration\s+.*$/, '$1Duration  <elapsed>')
+    .replace(/^(\s*[✓×❯↓].*?) \d+(?:\.\d+)?ms$/, '$1 <n>ms')
+}
+
+/**
+ * Strip ANSI codes, normalise newlines, redact local paths, replace timings,
+ * collapse blank runs, and keep the useful part: for a failing run that is
+ * everything up to the end of the first failure's details (the file list, the
+ * summary and the first assertion with its diff); for anything long without
+ * that structure, the head and the tail.
  */
 export function trimOutput(raw, { maxLines = 60, headLines = 44, tailLines = 8 } = {}) {
   const text = redactPaths(stripVTControlCharacters(raw).replace(/\r\n?/g, '\n'))
   const lines = []
   for (const line of text.split('\n')) {
-    const trimmed = line.trimEnd()
+    const trimmed = normaliseTimings(line.trimEnd())
     if (trimmed === '' && lines[lines.length - 1] === '') continue
     lines.push(trimmed)
   }
@@ -100,12 +125,8 @@ function commitInfo(ref) {
 }
 
 function sourceDiff() {
-  // ":(exclude)" pathspecs drop the test files; verified against this repo's
-  // git (2.56). If your git predates pathspec magic, filter by hand.
-  return git(['diff', BUG_REF, FIX_REF, '--', 'src', ':(exclude)*.test.ts', ':(exclude)*.test.tsx']).stdout.replace(
-    /\r\n?/g,
-    '\n',
-  )
+  // Same pathspec as prove-regression's HEAD-vs-tag check (src/, test files excluded).
+  return git(['diff', BUG_REF, FIX_REF, '--', ...SOURCE_PATHSPEC]).stdout.replace(/\r\n?/g, '\n')
 }
 
 function installedVersion(pkg) {
@@ -162,6 +183,15 @@ function renderCaseStudy(c, extras) {
   const steps = c.reproSteps.map((step, i) => `${i + 1}. ${step}`).join('\n')
   const stackList = c.stack.map((s) => `- ${s}`).join('\n')
   const changedFiles = extras.files.map((f) => `\`${f.path}\``).join(', ')
+  const headDrifted = c.headMatchesFixTag === false
+  const driftNote = headDrifted
+    ? `
+> **Note: generated with \`${ALLOW_HEAD_DRIFT_FLAG}\`.** When this write-up was built, the non-test
+> files under \`src/\` at \`HEAD\` differed from the \`${FIX_REF}\` tag. The diff below is between the
+> two tags, while the "After" test run was measured on \`HEAD\`, so the two may not describe exactly
+> the same code. \`case.json\` records this as \`"headMatchesFixTag": false\`.
+`
+    : ''
 
   return `# ${c.title}
 
@@ -169,7 +199,7 @@ function renderCaseStudy(c, extras) {
 > reproducible before/after example. It is not taken from anyone's codebase, and no
 > client was involved. Everything below was measured in this repository by
 > \`npm run case:build\` on ${c.generatedAt}.
-
+${driftNote}
 | | |
 |---|---|
 | Bug commit | \`${c.commits.bug.hash}\` — ${c.commits.bug.message} (tag \`${BUG_REF}\`) |
@@ -211,13 +241,16 @@ ${fence('diff', c.diff)}
 \`npm run prove\` (scripts/prove-regression.mjs) temporarily writes the \`${BUG_REF}\`
 version of ${changedFiles} into the working tree, runs the test suite from HEAD against
 it, restores the file, and runs the suite again. It exits 0 only when the first run fails
-and the second passes. Local paths are shown as \`<repo>\`; long output is trimmed where marked.
+and the second passes, judged from Vitest's own report (failed tests counted, test files that
+failed to load rejected), not from the exit code alone. Local paths are shown as \`<repo>\`;
+timings are replaced by \`<time>\`, \`<elapsed>\` and \`<n>ms\` so reruns are reproducible; long
+output is trimmed where marked.
 
 ### Before: tests run against the \`${BUG_REF}\` source
 
 ${fence('text', c.testOutputBefore)}
 
-### After: tests run on \`${FIX_REF}\`
+### After: tests run on ${headDrifted ? `\`HEAD\` (which differs from \`${FIX_REF}\`, see the note at the top)` : `\`${FIX_REF}\``}
 
 ${fence('text', c.testOutputAfter)}
 
@@ -267,7 +300,17 @@ rerun \`npm run case:build\` afterwards so this file and \`case.json\` match the
 // Main
 // ---------------------------------------------------------------------------
 
+function parseArgs(argv) {
+  const unknown = argv.filter((arg) => arg !== ALLOW_HEAD_DRIFT_FLAG)
+  if (unknown.length > 0) {
+    throw new Error(`Unknown option(s): ${unknown.join(' ')}. The only option is ${ALLOW_HEAD_DRIFT_FLAG}.`)
+  }
+  return { allowHeadDrift: argv.includes(ALLOW_HEAD_DRIFT_FLAG) }
+}
+
 function main() {
+  const { allowHeadDrift } = parseArgs(process.argv.slice(2))
+
   const proof = proveRegression()
   if (!proof.ok) {
     console.error('\nbuild-case: the regression proof did not hold; case files were NOT written.')
@@ -275,15 +318,41 @@ function main() {
     return
   }
 
-  const testOutputBefore = trimOutput(proof.before.output)
-  const testOutputAfter = trimOutput(proof.after.output)
-
-  // Sanity checks on what we are about to publish.
-  if (!/AssertionError|FAIL\b|\bfailed\b/.test(testOutputBefore)) {
-    throw new Error('Expected the "before" output to contain a failing assertion; refusing to write case files.')
+  if (!proof.headMatchesFixTag && !allowHeadDrift) {
+    console.error(
+      `\nbuild-case: the non-test files under src/ at HEAD differ from the ${FIX_REF} tag, so the diff ` +
+        `(${BUG_REF}..${FIX_REF}) and the "after" test run (measured on HEAD) would describe different code. ` +
+        'Case files were NOT written.\n' +
+        `  Either re-point ${FIX_REF} at the commit that holds the current src/ (see README, "Before publishing"),\n` +
+        `  or rerun with:  npm run case:build -- ${ALLOW_HEAD_DRIFT_FLAG}\n` +
+        '  to write the case anyway with "headMatchesFixTag": false in case.json and a visible note in CASE_STUDY.md.',
+    )
+    process.exitCode = 1
+    return
   }
-  if (!/\bpassed\b/.test(testOutputAfter) || /\bfailed\b/.test(testOutputAfter)) {
-    throw new Error('Expected the "after" output to show only passing tests; refusing to write case files.')
+
+  // Sanity checks on what we are about to publish, taken from the parsed
+  // Vitest reports (the same numbers prove-regression judged the runs by).
+  const { before, after } = proof
+  if (before.outcome !== 'failed' || !before.report || before.report.failedTests < 1 || before.report.suiteErrors.length > 0) {
+    throw new Error(
+      `Expected the "before" run to have at least one failed test and no test file that failed to load; ` +
+        `got ${describeRun(before)}. Refusing to write case files.`,
+    )
+  }
+  if (after.outcome !== 'passed' || !after.report || after.report.failedTests !== 0 || after.report.passedTests < 1) {
+    throw new Error(`Expected the "after" run to have only passing tests; got ${describeRun(after)}. Refusing to write case files.`)
+  }
+
+  const testOutputBefore = trimOutput(before.output)
+  const testOutputAfter = trimOutput(after.output)
+
+  // The trimmed text must still show the summary line those counts came from.
+  if (!testOutputBefore.includes(`${before.report.failedTests} failed`)) {
+    throw new Error('The trimmed "before" output no longer shows the failed-test count from the Vitest report; refusing to write case files.')
+  }
+  if (!testOutputAfter.includes(`${after.report.passedTests} passed`)) {
+    throw new Error('The trimmed "after" output no longer shows the passed-test count from the Vitest report; refusing to write case files.')
   }
 
   const testFileTracked = git(['ls-files', '--error-unmatch', caseContent.testFile], { allowFailure: true })
@@ -307,8 +376,12 @@ function main() {
     testOutputAfter,
     commits: { bug: commitInfo(BUG_REF), fix: commitInfo(FIX_REF) },
     repoUrl: caseContent.repoUrl,
-    generatedAt: new Date().toISOString(),
+    // A date, not a timestamp, so a rerun on the same history is byte-identical.
+    generatedAt: new Date().toISOString().slice(0, 10),
   }
+  // Only present when the case was knowingly written with HEAD drift; the
+  // website's sync script ignores unknown fields with a warning.
+  if (!proof.headMatchesFixTag) caseJson.headMatchesFixTag = false
 
   for (const [key, value] of Object.entries(caseJson)) {
     const empty =
@@ -327,6 +400,9 @@ function main() {
   writeFileSync(mdPath, renderCaseStudy(caseJson, { files: proof.files, lintBefore }), 'utf8')
 
   console.log(`\nWrote ${path.relative(repoRoot, jsonPath)} and ${path.relative(repoRoot, mdPath)}.`)
+  if (!proof.headMatchesFixTag) {
+    console.log(`Written with ${ALLOW_HEAD_DRIFT_FLAG}: HEAD's src/ differs from ${FIX_REF}; the study carries a note.`)
+  }
 }
 
 try {

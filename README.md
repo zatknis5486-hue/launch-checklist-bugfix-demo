@@ -55,9 +55,18 @@ npm run prove
 `scripts/prove-regression.mjs` finds the non-test files under `src/` that differ between the
 `demo-bug` and `demo-fix` tags, temporarily writes the `demo-bug` version of each into the working
 tree, runs the test suite from `HEAD` against it (expected: the regression tests fail), restores the
-files with `git checkout --` in a `finally` block, and runs the suite again (expected: pass). It
-exits 0 only if the first run failed and the second passed. It refuses to start if any of those
-files has uncommitted changes, so it cannot destroy work in progress.
+files with `git checkout --` in a `finally` block (on completion or error), and runs the suite again
+(expected: pass). It exits 0 only if the first run failed and the second passed.
+
+Each run is judged from Vitest's JSON report (written to `case/.tmp/`, gitignored), not from the
+exit code alone: run 1 counts as failed only if at least one test failed and no test file failed to
+load; run 2 counts as passed only if every collected test passed. A crash, an import error, a
+missing report or a Vitest process that is killed (it is given 10 minutes) is reported as an
+`ERROR` and never counts as proof. It refuses to start if any of the files it would touch has
+uncommitted changes, so it cannot destroy work in progress. It does not undo anything on start: if
+an earlier run was interrupted in a way the `finally` block could not survive (a hard kill), the
+refusal message prints the exact `git checkout -- <paths>` command that discards the leftover bug
+version, and the same command is printed whenever the restore itself fails.
 
 If `git` is not on your `PATH` (for example a portable Git on Windows), point the script at it:
 
@@ -80,11 +89,25 @@ npm run case:build
 ```
 
 `scripts/build-case.mjs` reruns the proof, trims both test outputs (ANSI codes removed, local paths
-replaced by `<repo>`), takes the real `git diff demo-bug demo-fix -- src` with test files excluded,
-reads both commit hashes and messages, reads the installed versions of the stack, runs ESLint on the
-`demo-bug` version of the changed file, and writes `case/case.json` and `case/CASE_STUDY.md`. It
-writes nothing if the proof does not hold. The narrative text (summary, symptom, root cause, lesson)
-lives in `scripts/case-content.mjs`; edit it there and rerun.
+replaced by `<repo>`, timings replaced by `<time>`, `<elapsed>` and `<n>ms`), takes the real
+`git diff demo-bug demo-fix -- src` with test files excluded, reads both commit hashes and messages,
+reads the installed versions of the stack, runs ESLint on the `demo-bug` version of the changed file,
+and writes `case/case.json` and `case/CASE_STUDY.md`. Its sanity checks use the same parsed Vitest
+reports as the proof. `generatedAt` is a date (`YYYY-MM-DD`), so running it twice on the same history
+rewrites both files byte for byte and leaves `git status` clean. The narrative text (summary, symptom,
+root cause, lesson) lives in `scripts/case-content.mjs`; edit it there and rerun.
+
+It writes nothing if the proof does not hold. It also refuses when the non-test files under `src/`
+at `HEAD` differ from the `demo-fix` tag, because the diff in the write-up is tag-to-tag while the
+"after" test run is measured on `HEAD`, and the two would then describe different code. Re-point
+`demo-fix` (see "Before publishing") or, if the drift is intended, pass the flag through npm:
+
+```sh
+npm run case:build -- --allow-head-drift
+```
+
+With the flag, `case.json` gains `"headMatchesFixTag": false` and `CASE_STUDY.md` carries a visible
+note; neither appears when `HEAD` matches the tag.
 
 ## Repository layout
 
@@ -103,6 +126,7 @@ scripts/build-case.mjs       generates case/case.json and case/CASE_STUDY.md
 scripts/case-content.mjs     human-written narrative used by build-case
 case/case.json               machine-readable case (generated)
 case/CASE_STUDY.md           human-readable case study (generated)
+case/.tmp/                   Vitest JSON reports from the last proof run (gitignored)
 eslint.config.js             ESLint 9 flat config with react-hooks rules
 vite.config.ts               Vite + Vitest config (jsdom, setup file)
 ```
