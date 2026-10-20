@@ -172,13 +172,16 @@ main      -> + "Add case write-up and regression proof scripts"
 The two tags are what the proof and the write-up are built from. Do not move them casually; if
 the history is rewritten (see below), re-point them by hand and regenerate the write-up.
 
-## Before publishing
+## Publishing notes
 
-The repository was created with placeholder authorship (`REPLACE_ME founder` /
-`REPLACE_ME@example.com`, set only in this repo's local git config). Before the demo goes public:
+This repository was published on 2026-10-20 at
+https://github.com/zatknis5486-hue/launch-checklist-bugfix-demo under the MIT license. Before
+that, its placeholder authorship was rewritten to "Launch Rescue Studio" with the steps below,
+the tags were re-pointed, and the screenshots and case data were regenerated. The steps stay
+here in case the history is ever rewritten again.
 
-1. **DECISION: author name and email for the public history.** Then rewrite authorship on every
-   commit:
+1. **Author name and email for the public history** (done 2026-10-20). To rewrite authorship on
+   every commit:
 
    ```sh
    git config user.name  "REPLACE_ME: your display name"
@@ -201,12 +204,11 @@ The repository was created with placeholder authorship (`REPLACE_ME founder` /
    `npm run case:build`, so `case/case.json`, `case/CASE_STUDY.md` and `case/screenshots/` carry
    the new hashes, and commit the regenerated files.
 
-2. **DECISION: public repository URL.** Replace the `repoUrl` placeholder in
-   `scripts/case-content.mjs` (it contains `REPLACE_ME`) and rerun `npm run case:build`.
-   Grep for `REPLACE_ME` and `TO_VERIFY` before publishing; nothing with those tokens should remain.
+2. **Public repository URL** (done 2026-10-20). `repoUrl` in `scripts/case-content.mjs` points at
+   the GitHub repository above; if the repository ever moves, change it there and rerun
+   `npm run case:build`.
 
-3. **DECISION: license.** No license file is included. Add one (for example MIT) if you want others
-   to reuse the code.
+3. **License** (done 2026-10-20): MIT, see `LICENSE`.
 
 4. The screenshots in `case/screenshots/` were captured from this app by `npm run case:screenshots`
    (Chrome 155 headless, 1024px-wide viewport). If you change the app's look or copy, recapture them
