@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { SearchBox } from './components/SearchBox'
 import { StatusFilter } from './components/StatusFilter'
 import { Summary } from './components/Summary'
@@ -12,11 +12,12 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<StatusFilterValue>('all')
 
-  const [visible, setVisible] = useState<Task[]>(tasks)
-
-  useEffect(() => {
-    setVisible(filterTasks(tasks, query, status))
-  }, [tasks])
+  // Derived data: computed from the current inputs on every relevant change,
+  // instead of being copied into its own state and synced with an effect.
+  const visible = useMemo(
+    () => filterTasks(tasks, query, status),
+    [tasks, query, status],
+  )
 
   function toggleTask(id: string) {
     setTasks((previous) =>
