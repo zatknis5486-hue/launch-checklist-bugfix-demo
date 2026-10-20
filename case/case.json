@@ -29,11 +29,11 @@
   "testOutputAfter": " RUN  v3.2.7 <repo>\n\n ✓ src/lib/filterTasks.test.ts (7 tests) <n>ms\n ✓ src/App.test.tsx (5 tests) <n>ms\n\n Test Files  2 passed (2)\n      Tests  12 passed (12)\n   Start at  <time>\n   Duration  <elapsed>",
   "commits": {
     "bug": {
-      "hash": "f046d6169579e6246e8641594acf4fe9773536bb",
+      "hash": "538d0e58552f7194d5025c1f9f5af517a1d83c1d",
       "message": "Initial Launch Checklist app"
     },
     "fix": {
-      "hash": "c9eb26dac438c3108a63ff1185ecea36d803e1e0",
+      "hash": "0564847a26ac81ae9f98c1474b3a6cf968cc0f27",
       "message": "Fix: search and status filters ignored (stale derived state)"
     }
   },
@@ -55,7 +55,7 @@
         "width": 1440,
         "height": 1620,
         "ref": "demo-bug",
-        "commit": "f046d6169579e6246e8641594acf4fe9773536bb",
+        "commit": "538d0e58552f7194d5025c1f9f5af517a1d83c1d",
         "summary": "Showing 9 of 9 tasks (6 open)",
         "visibleTasks": 9
       },
@@ -67,7 +67,7 @@
         "width": 1440,
         "height": 692,
         "ref": "demo-bug",
-        "commit": "f046d6169579e6246e8641594acf4fe9773536bb",
+        "commit": "538d0e58552f7194d5025c1f9f5af517a1d83c1d",
         "summary": "Showing 1 of 9 tasks (5 open)",
         "visibleTasks": 1
       },
@@ -79,7 +79,7 @@
         "width": 1440,
         "height": 692,
         "ref": "HEAD",
-        "commit": "49aaef723ec7254dade22dbfa097fb424d61c81d",
+        "commit": "f08d6c9b0ec786a91c21838a922f36245985968c",
         "summary": "Showing 1 of 9 tasks (6 open)",
         "visibleTasks": 1
       }

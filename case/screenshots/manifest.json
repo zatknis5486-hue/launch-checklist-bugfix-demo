@@ -17,7 +17,7 @@
   "shots": {
     "before-typed.png": {
       "ref": "demo-bug",
-      "commit": "f046d6169579e6246e8641594acf4fe9773536bb",
+      "commit": "538d0e58552f7194d5025c1f9f5af517a1d83c1d",
       "width": 1440,
       "height": 1620,
       "observed": {
@@ -43,7 +43,7 @@
     },
     "before-after-toggle.png": {
       "ref": "demo-bug",
-      "commit": "f046d6169579e6246e8641594acf4fe9773536bb",
+      "commit": "538d0e58552f7194d5025c1f9f5af517a1d83c1d",
       "width": 1440,
       "height": 692,
       "observed": {
@@ -59,7 +59,7 @@
     },
     "after-typed.png": {
       "ref": "HEAD",
-      "commit": "49aaef723ec7254dade22dbfa097fb424d61c81d",
+      "commit": "f08d6c9b0ec786a91c21838a922f36245985968c",
       "width": 1440,
       "height": 692,
       "observed": {

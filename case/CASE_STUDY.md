@@ -7,8 +7,8 @@
 
 | | |
 |---|---|
-| Bug commit | `f046d6169579e6246e8641594acf4fe9773536bb` — Initial Launch Checklist app (tag `demo-bug`) |
-| Fix commit | `c9eb26dac438c3108a63ff1185ecea36d803e1e0` — Fix: search and status filters ignored (stale derived state) (tag `demo-fix`) |
+| Bug commit | `538d0e58552f7194d5025c1f9f5af517a1d83c1d` — Initial Launch Checklist app (tag `demo-bug`) |
+| Fix commit | `0564847a26ac81ae9f98c1474b3a6cf968cc0f27` — Fix: search and status filters ignored (stale derived state) (tag `demo-fix`) |
 | Regression test | `src/App.test.tsx` |
 | Source files changed by the fix | `src/App.tsx` |
 | Public repository | REPLACE_ME: public repo URL once the founder publishes the demo |
@@ -191,7 +191,7 @@ quotes what it read at the moment of the capture. The images are unedited captur
 
 Before the fix. "redirect" has been typed into the search box, yet all 9 tasks are still listed and the summary still says 9 of 9.
 
-Page state read by the script: summary "Showing 9 of 9 tasks (6 open)", 9 task rows; source: `demo-bug` (`f046d61`).
+Page state read by the script: summary "Showing 9 of 9 tasks (6 open)", 9 task rows; source: `demo-bug` (`538d0e5`).
 
 ### Before the fix: one checkbox ticked, the stale filter suddenly applies
 
@@ -199,7 +199,7 @@ Page state read by the script: summary "Showing 9 of 9 tasks (6 open)", 9 task r
 
 Still before the fix. Ticking one checkbox changes the task array, the effect finally re-runs, and the list suddenly applies the search typed earlier. This is what made the bug look intermittent.
 
-Page state read by the script: summary "Showing 1 of 9 tasks (5 open)", 1 task row; source: `demo-bug` (`f046d61`).
+Page state read by the script: summary "Showing 1 of 9 tasks (5 open)", 1 task row; source: `demo-bug` (`538d0e5`).
 
 ### After the fix: the same keystrokes filter as you type
 
@@ -207,12 +207,12 @@ Page state read by the script: summary "Showing 1 of 9 tasks (5 open)", 1 task r
 
 After the fix. The same keystrokes narrow the list as you type: 1 of 9 tasks shown, no checkbox touched.
 
-Page state read by the script: summary "Showing 1 of 9 tasks (6 open)", 1 task row; source: `HEAD` at capture time (`49aaef7`), whose non-test `src/` is identical to `demo-fix`.
+Page state read by the script: summary "Showing 1 of 9 tasks (6 open)", 1 task row; source: `HEAD` at capture time (`f08d6c9`), whose non-test `src/` is identical to `demo-fix`.
 
 ## Commits
 
-- `f046d6169579e6246e8641594acf4fe9773536bb` Initial Launch Checklist app
-- `c9eb26dac438c3108a63ff1185ecea36d803e1e0` Fix: search and status filters ignored (stale derived state)
+- `538d0e58552f7194d5025c1f9f5af517a1d83c1d` Initial Launch Checklist app
+- `0564847a26ac81ae9f98c1474b3a6cf968cc0f27` Fix: search and status filters ignored (stale derived state)
 
 Note for the publisher: rewriting authorship before publishing (see README) changes these hashes;
 rerun `npm run case:screenshots` and `npm run case:build` afterwards so this file, `case.json` and the
