@@ -38,5 +38,51 @@
     }
   },
   "repoUrl": "REPLACE_ME: public repo URL once the founder publishes the demo",
-  "generatedAt": "2026-10-20"
+  "generatedAt": "2026-10-20",
+  "screenshots": {
+    "capturedAt": "2026-10-20",
+    "tool": "scripts/capture-screenshots.mjs (Chrome DevTools protocol, headless)",
+    "browser": "Chrome/155.0.8059.40",
+    "viewport": "1024x900 CSS px at 2x",
+    "colorScheme": "light",
+    "query": "redirect",
+    "images": [
+      {
+        "file": "case/screenshots/before-typed.png",
+        "title": "Before the fix: \"redirect\" typed, nothing filtered",
+        "alt": "The Launch Checklist app at the demo-bug commit with \"redirect\" typed in the search box: all nine tasks are still listed and the summary reads \"Showing 9 of 9 tasks (6 open)\".",
+        "caption": "Before the fix. \"redirect\" has been typed into the search box, yet all 9 tasks are still listed and the summary still says 9 of 9.",
+        "width": 1440,
+        "height": 1620,
+        "ref": "demo-bug",
+        "commit": "f046d6169579e6246e8641594acf4fe9773536bb",
+        "summary": "Showing 9 of 9 tasks (6 open)",
+        "visibleTasks": 9
+      },
+      {
+        "file": "case/screenshots/before-after-toggle.png",
+        "title": "Before the fix: one checkbox ticked, the stale filter suddenly applies",
+        "alt": "The same app after ticking the checkbox of \"Configure Supabase auth redirect URL for the production domain\": only that task is listed, struck through, and the summary reads \"Showing 1 of 9 tasks (5 open)\".",
+        "caption": "Still before the fix. Ticking one checkbox changes the task array, the effect finally re-runs, and the list suddenly applies the search typed earlier. This is what made the bug look intermittent.",
+        "width": 1440,
+        "height": 692,
+        "ref": "demo-bug",
+        "commit": "f046d6169579e6246e8641594acf4fe9773536bb",
+        "summary": "Showing 1 of 9 tasks (5 open)",
+        "visibleTasks": 1
+      },
+      {
+        "file": "case/screenshots/after-typed.png",
+        "title": "After the fix: the same keystrokes filter as you type",
+        "alt": "The fixed app with \"redirect\" typed in the search box: only \"Configure Supabase auth redirect URL for the production domain\" is listed and the summary reads \"Showing 1 of 9 tasks (6 open)\".",
+        "caption": "After the fix. The same keystrokes narrow the list as you type: 1 of 9 tasks shown, no checkbox touched.",
+        "width": 1440,
+        "height": 692,
+        "ref": "HEAD",
+        "commit": "49aaef723ec7254dade22dbfa097fb424d61c81d",
+        "summary": "Showing 1 of 9 tasks (6 open)",
+        "visibleTasks": 1
+      }
+    ]
+  }
 }

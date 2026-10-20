@@ -60,5 +60,48 @@ export const caseContent = {
 
   testFile: 'src/App.test.tsx',
 
+  /**
+   * Images under case/screenshots/, written by `npm run case:screenshots`
+   * (scripts/capture-screenshots.mjs) together with manifest.json. Only the
+   * words here are hand-written; build-case.mjs takes the dimensions, the
+   * commit each image was taken from and the summary line read from the page
+   * at capture time from the manifest, and refuses to build when they no
+   * longer match this repository. Paths are relative to the repo root.
+   * Leave the list empty to publish without screenshots.
+   */
+  screenshots: [
+    {
+      file: 'case/screenshots/before-typed.png',
+      title: 'Before the fix: "redirect" typed, nothing filtered',
+      alt:
+        'The Launch Checklist app at the demo-bug commit with "redirect" typed in the search box: ' +
+        'all nine tasks are still listed and the summary reads "Showing 9 of 9 tasks (6 open)".',
+      caption:
+        'Before the fix. "redirect" has been typed into the search box, yet all 9 tasks are still ' +
+        'listed and the summary still says 9 of 9.',
+    },
+    {
+      file: 'case/screenshots/before-after-toggle.png',
+      title: 'Before the fix: one checkbox ticked, the stale filter suddenly applies',
+      alt:
+        'The same app after ticking the checkbox of "Configure Supabase auth redirect URL for the ' +
+        'production domain": only that task is listed, struck through, and the summary reads ' +
+        '"Showing 1 of 9 tasks (5 open)".',
+      caption:
+        'Still before the fix. Ticking one checkbox changes the task array, the effect finally re-runs, ' +
+        'and the list suddenly applies the search typed earlier. This is what made the bug look intermittent.',
+    },
+    {
+      file: 'case/screenshots/after-typed.png',
+      title: 'After the fix: the same keystrokes filter as you type',
+      alt:
+        'The fixed app with "redirect" typed in the search box: only "Configure Supabase auth redirect ' +
+        'URL for the production domain" is listed and the summary reads "Showing 1 of 9 tasks (6 open)".',
+      caption:
+        'After the fix. The same keystrokes narrow the list as you type: 1 of 9 tasks shown, ' +
+        'no checkbox touched.',
+    },
+  ],
+
   repoUrl: 'REPLACE_ME: public repo URL once the founder publishes the demo',
 }

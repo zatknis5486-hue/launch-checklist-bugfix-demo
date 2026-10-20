@@ -9,7 +9,11 @@
  *   - reads both commit hashes and messages;
  *   - reads the exact versions of the stack from node_modules;
  *   - runs ESLint on the bug version of the changed file(s), to show the
- *     warning that was already pointing at the problem.
+ *     warning that was already pointing at the problem;
+ *   - pairs the screenshots listed in case-content.mjs with what
+ *     scripts/capture-screenshots.mjs recorded in case/screenshots/manifest.json
+ *     (dimensions, the commit each image was taken from, the summary line read
+ *     from the page) and refuses to build when they no longer match the repo.
  *
  * It then writes case/case.json (machine-readable, fixed field set) and
  * case/CASE_STUDY.md (human-readable). Nothing is written if the proof does
@@ -32,11 +36,17 @@ import { spawnSync } from 'node:child_process'
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { stripVTControlCharacters } from 'node:util'
+import { MANIFEST_FILE, SCREENSHOT_DIR, readPngSize } from './capture-screenshots.mjs'
 import { caseContent } from './case-content.mjs'
 import { BUG_REF, FIX_REF, SOURCE_PATHSPEC, describeRun, git, proveRegression, repoRoot } from './prove-regression.mjs'
 
 const caseDir = path.join(repoRoot, 'case')
 const ALLOW_HEAD_DRIFT_FLAG = '--allow-head-drift'
+
+/** Repo-relative path with forward slashes, for messages and the write-up. */
+function rel(p) {
+  return path.relative(repoRoot, p).replace(/\\/g, '/')
+}
 
 // ---------------------------------------------------------------------------
 // Output cleaning
@@ -172,11 +182,162 @@ function lintOutputBefore(files) {
 }
 
 // ---------------------------------------------------------------------------
+// Screenshots (captured by scripts/capture-screenshots.mjs)
+// ---------------------------------------------------------------------------
+
+const RECAPTURE = 'Rerun "npm run case:screenshots" (then "npm run case:build").'
+
+/**
+ * Pairs each screenshot listed in case-content.mjs with what the capture
+ * script recorded in case/screenshots/manifest.json and checks that both still
+ * describe this repository: the file exists and is the PNG the manifest
+ * measured, a "before" image was taken at the demo-bug commit, and an "after"
+ * image at a commit whose non-test src/ is identical to demo-fix. The words
+ * (title, alt, caption) come from case-content; the facts (size, commit, the
+ * summary line read from the page) come from the manifest.
+ * Returns null when case-content lists no screenshots.
+ */
+function screenshotFacts(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return null
+  let manifest
+  try {
+    manifest = JSON.parse(readFileSync(MANIFEST_FILE, 'utf8'))
+  } catch (error) {
+    throw new Error(`case-content.mjs lists screenshots but ${rel(MANIFEST_FILE)} could not be read (${error.message}). ${RECAPTURE}`)
+  }
+  const viewport = manifest && manifest.viewport
+  if (
+    !manifest ||
+    typeof manifest.shots !== 'object' ||
+    typeof manifest.capturedAt !== 'string' ||
+    typeof manifest.browser !== 'string' ||
+    typeof manifest.query !== 'string' ||
+    !viewport ||
+    ![viewport.width, viewport.height, viewport.deviceScaleFactor].every((n) => typeof n === 'number')
+  ) {
+    throw new Error(`${rel(MANIFEST_FILE)} is not shaped like the capture script's output. ${RECAPTURE}`)
+  }
+
+  const bugHash = git(['rev-parse', `${BUG_REF}^{commit}`]).stdout.trim()
+  const images = entries.map((entry) => {
+    for (const key of ['file', 'title', 'alt', 'caption']) {
+      if (typeof entry[key] !== 'string' || entry[key].trim() === '') {
+        throw new Error(`Screenshot entry ${JSON.stringify(entry.file)} in case-content.mjs needs a non-empty "${key}".`)
+      }
+    }
+    const absolute = path.resolve(repoRoot, entry.file)
+    const inside = path.relative(SCREENSHOT_DIR, absolute)
+    if (inside === '' || inside.startsWith('..') || path.isAbsolute(inside)) {
+      throw new Error(`Screenshot ${entry.file} must live under ${rel(SCREENSHOT_DIR)}/.`)
+    }
+    const name = path.basename(absolute)
+    const shot = manifest.shots[name]
+    if (!shot || typeof shot !== 'object') {
+      throw new Error(`${entry.file} is not recorded in ${rel(MANIFEST_FILE)}. ${RECAPTURE}`)
+    }
+    let size
+    try {
+      size = readPngSize(readFileSync(absolute))
+    } catch (error) {
+      throw new Error(`${entry.file}: ${error.message}. ${RECAPTURE}`)
+    }
+    if (size.width !== shot.width || size.height !== shot.height) {
+      throw new Error(
+        `${entry.file} is ${size.width}x${size.height} px but the manifest recorded ${shot.width}x${shot.height}. ${RECAPTURE}`,
+      )
+    }
+    if (typeof shot.commit !== 'string' || !/^[0-9a-f]{40}$/.test(shot.commit)) {
+      throw new Error(`${entry.file}: the manifest has no commit hash for it. ${RECAPTURE}`)
+    }
+    if (shot.ref === BUG_REF) {
+      if (shot.commit !== bugHash) {
+        throw new Error(`${entry.file} was captured at ${shot.commit}, but ${BUG_REF} now points at ${bugHash}. ${RECAPTURE}`)
+      }
+    } else {
+      const same = git(['diff', '--quiet', FIX_REF, shot.commit, '--', ...SOURCE_PATHSPEC], { allowFailure: true })
+      if (same.status !== 0) {
+        const why = same.status === 1 ? 'differs from' : 'could not be compared with'
+        throw new Error(`${entry.file} was captured at ${shot.commit}, whose non-test src/ ${why} ${FIX_REF}. ${RECAPTURE}`)
+      }
+    }
+    const observed = shot.observed
+    if (!observed || typeof observed.summary !== 'string' || !Array.isArray(observed.visible)) {
+      throw new Error(`${entry.file}: the manifest entry lacks the page state read at capture time. ${RECAPTURE}`)
+    }
+    return {
+      file: entry.file.replace(/\\/g, '/'),
+      title: entry.title,
+      alt: entry.alt,
+      caption: entry.caption,
+      width: size.width,
+      height: size.height,
+      ref: shot.ref === BUG_REF ? BUG_REF : 'HEAD',
+      commit: shot.commit,
+      summary: observed.summary,
+      visibleTasks: observed.visible.length,
+    }
+  })
+
+  return {
+    capturedAt: manifest.capturedAt,
+    tool: typeof manifest.tool === 'string' ? manifest.tool : 'scripts/capture-screenshots.mjs',
+    browser: manifest.browser,
+    viewport: `${viewport.width}x${viewport.height} CSS px at ${viewport.deviceScaleFactor}x`,
+    colorScheme: typeof manifest.colorScheme === 'string' ? manifest.colorScheme : 'light',
+    query: manifest.query,
+    images,
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Rendering
 // ---------------------------------------------------------------------------
 
 function fence(lang, body) {
   return `\`\`\`${lang}\n${body.trimEnd()}\n\`\`\``
+}
+
+function renderScreenshots(s) {
+  const images = s.images
+    .map((image) => {
+      const source =
+        image.ref === BUG_REF
+          ? `\`${BUG_REF}\` (\`${image.commit.slice(0, 7)}\`)`
+          : `\`HEAD\` at capture time (\`${image.commit.slice(0, 7)}\`), whose non-test \`src/\` is identical to \`${FIX_REF}\``
+      const rows = `${image.visibleTasks} task row${image.visibleTasks === 1 ? '' : 's'}`
+      return `### ${image.title}
+
+![${image.alt}](${path.posix.relative('case', image.file)})
+
+${image.caption}
+
+Page state read by the script: summary "${image.summary}", ${rows}; source: ${source}.`
+    })
+    .join('\n\n')
+
+  return `## Screenshots
+
+Captured by \`npm run case:screenshots\` (scripts/capture-screenshots.mjs) on ${s.capturedAt} with ${s.browser}
+running headless, viewport ${s.viewport}, ${s.colorScheme} colour scheme. The script writes the \`${BUG_REF}\`
+version of the changed source file into the working tree the same way the proof does, drives this repo's dev
+server over the Chrome DevTools protocol, clicks the search box and types "${s.query}" key by key, reads the
+summary line and the task rows back from the DOM, and refuses to capture when they differ from what is
+described here. It then restores the file and repeats the typing on the fixed code. Each "Page state" line
+quotes what it read at the moment of the capture. The images are unedited captures of the app area
+(\`main.app\`) in this repository, not mock-ups.
+
+${images}`
+}
+
+function renderScreenshotInstructions() {
+  return `## Screenshot instructions (no screenshots are included yet)
+
+This write-up was generated without screenshots. To add honest before/after captures, run
+\`npm run case:screenshots\` (it drives a locally installed Chrome or Edge headless and downloads nothing;
+see the README). It writes \`case/screenshots/before-typed.png\`, \`before-after-toggle.png\`,
+\`after-typed.png\` and \`manifest.json\`. Then list the images under \`screenshots\` in
+\`scripts/case-content.mjs\` and rerun \`npm run case:build\`. Do not present them as anything other than
+captures of this demo app.`
 }
 
 function renderCaseStudy(c, extras) {
@@ -265,26 +426,7 @@ ${fence('text', extras.lintBefore || '(not captured)')}
 
 ${c.lesson}
 
-## Screenshot instructions (no screenshots are included yet)
-
-This write-up was generated without a browser, so it contains **no screenshots**. To add
-honest before/after screenshots yourself:
-
-1. \`git checkout ${BUG_REF}\` (detached HEAD is fine). Run \`npm run dev\` and open the printed
-   localhost URL. Use a plain browser window with no personal bookmarks or extensions visible.
-2. Type \`redirect\` in the **Search tasks** box. The list still shows all 9 tasks and the summary
-   still reads "Showing 9 of 9 tasks (6 open)". Capture the app area and save it as
-   \`case/screenshots/before-search.png\`.
-3. Click the **Open** chip. The 3 done tasks are still listed. Save as
-   \`case/screenshots/before-status.png\`.
-4. Stop the dev server. \`git checkout main\` and run \`npm run dev\` again.
-5. Repeat step 2: only one task remains and the summary reads "Showing 1 of 9 tasks (6 open)".
-   Save as \`case/screenshots/after-search.png\`.
-6. Repeat step 3 (clear the search box first): 6 open tasks remain. Save as
-   \`case/screenshots/after-status.png\`.
-7. Keep the window size identical for all four captures, crop to the app, then reference the
-   images from this file under a new "Screenshots" heading and commit them together with the
-   images. Do not present them as anything other than captures of this demo app.
+${c.screenshots ? renderScreenshots(c.screenshots) : renderScreenshotInstructions()}
 
 ## Commits
 
@@ -292,7 +434,8 @@ honest before/after screenshots yourself:
 - \`${c.commits.fix.hash}\` ${c.commits.fix.message}
 
 Note for the publisher: rewriting authorship before publishing (see README) changes these hashes;
-rerun \`npm run case:build\` afterwards so this file and \`case.json\` match the published history.
+rerun \`npm run case:screenshots\` and \`npm run case:build\` afterwards so this file, \`case.json\` and the
+screenshots' manifest match the published history.
 `
 }
 
@@ -360,6 +503,8 @@ function main() {
     throw new Error(`Regression test ${caseContent.testFile} is not tracked by git.`)
   }
 
+  const screenshots = screenshotFacts(caseContent.screenshots)
+
   const caseJson = {
     label: caseContent.label,
     title: caseContent.title,
@@ -382,6 +527,8 @@ function main() {
   // Only present when the case was knowingly written with HEAD drift; the
   // website's sync script ignores unknown fields with a warning.
   if (!proof.headMatchesFixTag) caseJson.headMatchesFixTag = false
+  // Only present when case-content.mjs lists screenshots (see screenshotFacts).
+  if (screenshots) caseJson.screenshots = screenshots
 
   for (const [key, value] of Object.entries(caseJson)) {
     const empty =

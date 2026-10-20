@@ -174,26 +174,40 @@ configured at its default level, "warn"):
 
 If a value can be computed from props or state, compute it during render (a plain expression or useMemo) instead of copying it into state and syncing it with an effect. Treat react-hooks/exhaustive-deps warnings as bugs until proven otherwise, and cover the user-visible behaviour with a test that fails before the fix.
 
-## Screenshot instructions (no screenshots are included yet)
+## Screenshots
 
-This write-up was generated without a browser, so it contains **no screenshots**. To add
-honest before/after screenshots yourself:
+Captured by `npm run case:screenshots` (scripts/capture-screenshots.mjs) on 2026-10-20 with Chrome/155.0.8059.40
+running headless, viewport 1024x900 CSS px at 2x, light colour scheme. The script writes the `demo-bug`
+version of the changed source file into the working tree the same way the proof does, drives this repo's dev
+server over the Chrome DevTools protocol, clicks the search box and types "redirect" key by key, reads the
+summary line and the task rows back from the DOM, and refuses to capture when they differ from what is
+described here. It then restores the file and repeats the typing on the fixed code. Each "Page state" line
+quotes what it read at the moment of the capture. The images are unedited captures of the app area
+(`main.app`) in this repository, not mock-ups.
 
-1. `git checkout demo-bug` (detached HEAD is fine). Run `npm run dev` and open the printed
-   localhost URL. Use a plain browser window with no personal bookmarks or extensions visible.
-2. Type `redirect` in the **Search tasks** box. The list still shows all 9 tasks and the summary
-   still reads "Showing 9 of 9 tasks (6 open)". Capture the app area and save it as
-   `case/screenshots/before-search.png`.
-3. Click the **Open** chip. The 3 done tasks are still listed. Save as
-   `case/screenshots/before-status.png`.
-4. Stop the dev server. `git checkout main` and run `npm run dev` again.
-5. Repeat step 2: only one task remains and the summary reads "Showing 1 of 9 tasks (6 open)".
-   Save as `case/screenshots/after-search.png`.
-6. Repeat step 3 (clear the search box first): 6 open tasks remain. Save as
-   `case/screenshots/after-status.png`.
-7. Keep the window size identical for all four captures, crop to the app, then reference the
-   images from this file under a new "Screenshots" heading and commit them together with the
-   images. Do not present them as anything other than captures of this demo app.
+### Before the fix: "redirect" typed, nothing filtered
+
+![The Launch Checklist app at the demo-bug commit with "redirect" typed in the search box: all nine tasks are still listed and the summary reads "Showing 9 of 9 tasks (6 open)".](screenshots/before-typed.png)
+
+Before the fix. "redirect" has been typed into the search box, yet all 9 tasks are still listed and the summary still says 9 of 9.
+
+Page state read by the script: summary "Showing 9 of 9 tasks (6 open)", 9 task rows; source: `demo-bug` (`f046d61`).
+
+### Before the fix: one checkbox ticked, the stale filter suddenly applies
+
+![The same app after ticking the checkbox of "Configure Supabase auth redirect URL for the production domain": only that task is listed, struck through, and the summary reads "Showing 1 of 9 tasks (5 open)".](screenshots/before-after-toggle.png)
+
+Still before the fix. Ticking one checkbox changes the task array, the effect finally re-runs, and the list suddenly applies the search typed earlier. This is what made the bug look intermittent.
+
+Page state read by the script: summary "Showing 1 of 9 tasks (5 open)", 1 task row; source: `demo-bug` (`f046d61`).
+
+### After the fix: the same keystrokes filter as you type
+
+![The fixed app with "redirect" typed in the search box: only "Configure Supabase auth redirect URL for the production domain" is listed and the summary reads "Showing 1 of 9 tasks (6 open)".](screenshots/after-typed.png)
+
+After the fix. The same keystrokes narrow the list as you type: 1 of 9 tasks shown, no checkbox touched.
+
+Page state read by the script: summary "Showing 1 of 9 tasks (6 open)", 1 task row; source: `HEAD` at capture time (`49aaef7`), whose non-test `src/` is identical to `demo-fix`.
 
 ## Commits
 
@@ -201,4 +215,5 @@ honest before/after screenshots yourself:
 - `c9eb26dac438c3108a63ff1185ecea36d803e1e0` Fix: search and status filters ignored (stale derived state)
 
 Note for the publisher: rewriting authorship before publishing (see README) changes these hashes;
-rerun `npm run case:build` afterwards so this file and `case.json` match the published history.
+rerun `npm run case:screenshots` and `npm run case:build` afterwards so this file, `case.json` and the
+screenshots' manifest match the published history.

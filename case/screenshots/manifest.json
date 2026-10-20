@@ -1,0 +1,75 @@
+{
+  "capturedAt": "2026-10-20",
+  "tool": "scripts/capture-screenshots.mjs (Chrome DevTools protocol, headless)",
+  "browser": "Chrome/155.0.8059.40",
+  "browserExecutable": "chrome.exe",
+  "viewport": {
+    "width": 1024,
+    "height": 900,
+    "deviceScaleFactor": 2,
+    "unit": "CSS px"
+  },
+  "colorScheme": "light",
+  "query": "redirect",
+  "sourceFiles": [
+    "src/App.tsx"
+  ],
+  "shots": {
+    "before-typed.png": {
+      "ref": "demo-bug",
+      "commit": "f046d6169579e6246e8641594acf4fe9773536bb",
+      "width": 1440,
+      "height": 1620,
+      "observed": {
+        "summary": "Showing 9 of 9 tasks (6 open)",
+        "search": "redirect",
+        "visible": [
+          "Set VITE_SUPABASE_URL in Vercel project settings",
+          "Set VITE_SUPABASE_ANON_KEY in Vercel project settings",
+          "Enable RLS on profiles table",
+          "Configure Supabase auth redirect URL for the production domain",
+          "Review the magic-link email template in Supabase Auth",
+          "Run production build locally",
+          "Fix TypeScript errors that block the production build",
+          "Add a 404 page and an error boundary",
+          "Set up an uptime check for the production URL"
+        ],
+        "checked": [
+          "Set VITE_SUPABASE_ANON_KEY in Vercel project settings",
+          "Review the magic-link email template in Supabase Auth",
+          "Run production build locally"
+        ]
+      }
+    },
+    "before-after-toggle.png": {
+      "ref": "demo-bug",
+      "commit": "f046d6169579e6246e8641594acf4fe9773536bb",
+      "width": 1440,
+      "height": 692,
+      "observed": {
+        "summary": "Showing 1 of 9 tasks (5 open)",
+        "search": "redirect",
+        "visible": [
+          "Configure Supabase auth redirect URL for the production domain"
+        ],
+        "checked": [
+          "Configure Supabase auth redirect URL for the production domain"
+        ]
+      }
+    },
+    "after-typed.png": {
+      "ref": "HEAD",
+      "commit": "49aaef723ec7254dade22dbfa097fb424d61c81d",
+      "width": 1440,
+      "height": 692,
+      "observed": {
+        "summary": "Showing 1 of 9 tasks (6 open)",
+        "search": "redirect",
+        "visible": [
+          "Configure Supabase auth redirect URL for the production domain"
+        ],
+        "checked": []
+      }
+    }
+  }
+}

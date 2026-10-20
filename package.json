@@ -12,6 +12,7 @@
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "prove": "node scripts/prove-regression.mjs",
+    "case:screenshots": "node scripts/capture-screenshots.mjs",
     "case:build": "node scripts/build-case.mjs"
   },
   "dependencies": {
